@@ -1,0 +1,55 @@
+{
+  "name": "n8n-nodes-pisama",
+  "version": "0.3.0",
+  "description": "n8n community node that forwards workflow executions to Pisama for failure detection and self-healing",
+  "keywords": [
+    "n8n-community-node-package",
+    "pisama",
+    "observability",
+    "failure-detection",
+    "ai-agents"
+  ],
+  "license": "MIT",
+  "homepage": "https://pisama.ai",
+  "author": {
+    "name": "Pisama",
+    "email": "support@pisama.ai"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Pisama-AI/n8n-nodes-pisama.git"
+  },
+  "scripts": {
+    "build": "n8n-node build",
+    "dev": "n8n-node dev",
+    "lint": "n8n-node lint",
+    "lint:fix": "n8n-node lint --fix",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build && npm run lint"
+  },
+  "files": [
+    "dist"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "strict": true,
+    "credentials": [
+      "dist/credentials/PisamaApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/Pisama/Pisama.node.js"
+    ]
+  },
+  "devDependencies": {
+    "@n8n/node-cli": "^0.39.2",
+    "@types/node": "^20.0.0",
+    "eslint": "^9.32.0",
+    "n8n-workflow": "^1.70.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  }
+}
