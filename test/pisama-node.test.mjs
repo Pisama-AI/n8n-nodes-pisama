@@ -46,19 +46,27 @@ function makeContext(opts) {
 		credentials,
 		includeWorkflow = true,
 		runQuality = true,
+		strictMode = false,
 		prevNodeByIndex,
 		inputSourceNode,
 		proxyThrows = false,
 		execution,
 		postResponse = { received: true },
+		postError,
 		continueOnFail = false,
 	} = opts;
 
 	const httpCalls = [];
+	const warnings = [];
 	const ctx = {
 		getInputData: () => items,
 		getCredentials: async () => credentials,
-		getNodeParameter: (name) => (name === 'includeWorkflow' ? includeWorkflow : runQuality),
+		getNodeParameter: (name, _itemIndex, fallback) => {
+			if (name === 'includeWorkflow') return includeWorkflow;
+			if (name === 'runQuality') return runQuality;
+			if (name === 'strictMode') return strictMode;
+			return fallback;
+		},
 		getExecutionId: () => 'exec-1',
 		getWorkflow: () => ({ id: 'wf-1', name: 'Test WF', active: true }),
 		getMode: () => 'manual',
@@ -73,25 +81,26 @@ function makeContext(opts) {
 		},
 		continueOnFail: () => continueOnFail,
 		getNode: () => ({ name: 'Pisama' }),
-		logger: { warn: () => {} },
+		logger: { warn: (msg) => warnings.push(msg) },
 		helpers: {
 			httpRequest: async (request) => {
 				httpCalls.push(request);
 				if (request.method === 'GET') return execution;
+				if (postError) throw postError;
 				return postResponse;
 			},
 		},
 	};
-	return { ctx, httpCalls };
+	return { ctx, httpCalls, warnings };
 }
 
 async function run(opts) {
-	const { ctx, httpCalls } = makeContext(opts);
+	const { ctx, httpCalls, warnings } = makeContext(opts);
 	const result = await new Pisama().execute.call(ctx);
 	const post = httpCalls.find((c) => c.method === 'POST');
 	const get = httpCalls.find((c) => c.method === 'GET');
 	const body = post ? JSON.parse(post.body) : undefined;
-	return { result, httpCalls, post, get, body };
+	return { result, httpCalls, post, get, body, warnings };
 }
 
 const TIER2_CREDS = {
@@ -329,5 +338,94 @@ describe('Pisama node — Tier 1 (n8n API connected)', () => {
 		// No usable API data → Tier 2 shape/provenance retained.
 		expect(body.telemetrySource).toBe('n8n_api'); // source flips on attempt
 		expect(Array.isArray(body.data.resultData.runData['AI Agent'])).toBe(true);
+	});
+});
+
+describe('Pisama node — failure isolation (v0.4)', () => {
+	const BASE = {
+		items: [{ json: { output: 'hi' } }],
+		credentials: TIER2_CREDS,
+		prevNodeByIndex: () => 'AI Agent',
+		inputSourceNode: 'AI Agent',
+	};
+
+	function httpError(message, status) {
+		const error = new Error(message);
+		if (status !== undefined) {
+			error.response = { status };
+			error.statusCode = status;
+		}
+		return error;
+	}
+
+	it('sends with a bounded 10 second timeout', async () => {
+		const { post } = await run(BASE);
+		expect(post.timeout).toBe(10_000);
+	});
+
+	it('a 403 from Pisama resolves with forwarded:false and warns with the status', async () => {
+		const { result, warnings } = await run({
+			...BASE,
+			postError: httpError('403 - Forbidden', 403),
+		});
+		expect(result[0]).toHaveLength(1);
+		expect(result[0][0].json.forwarded).toBe(false);
+		expect(result[0][0].json.error).toContain('403');
+		expect(result[0][0].pairedItem).toEqual({ item: 0 });
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toContain('status 403');
+	});
+
+	it('a 500 from Pisama resolves with forwarded:false', async () => {
+		const { result, warnings } = await run({
+			...BASE,
+			postError: httpError('500 - Internal Server Error', 500),
+		});
+		expect(result[0][0].json.forwarded).toBe(false);
+		expect(result[0][0].json.error).toContain('500');
+		expect(warnings[0]).toContain('status 500');
+	});
+
+	it('a timed-out / rejected send resolves with forwarded:false', async () => {
+		const { result, warnings } = await run({
+			...BASE,
+			postError: new Error('timeout of 10000ms exceeded'),
+		});
+		expect(result[0][0].json.forwarded).toBe(false);
+		expect(result[0][0].json.error).toBe('timeout of 10000ms exceeded');
+		// No HTTP status on a timeout — the warning must not fabricate one.
+		expect(warnings[0]).toContain('timeout of 10000ms exceeded');
+		expect(warnings[0]).not.toContain('status');
+	});
+
+	it('strictMode=true with continueOnFail=false throws (pre-0.4 behavior)', async () => {
+		await expect(
+			run({
+				...BASE,
+				strictMode: true,
+				continueOnFail: false,
+				postError: httpError('403 - Forbidden', 403),
+			}),
+		).rejects.toThrow();
+	});
+
+	it('strictMode=true with continueOnFail=true emits the legacy error item', async () => {
+		const { result } = await run({
+			...BASE,
+			strictMode: true,
+			continueOnFail: true,
+			postError: httpError('500 - Internal Server Error', 500),
+		});
+		expect(result[0][0].json.error).toContain('500');
+		// Legacy shape: no forwarded flag in the continueOnFail path.
+		expect(result[0][0].json.forwarded).toBeUndefined();
+	});
+
+	it('a non-JSON success body does not throw and surfaces the raw string', async () => {
+		const { result } = await run({
+			...BASE,
+			postResponse: 'OK — accepted',
+		});
+		expect(result[0][0].json).toEqual({ response: 'OK — accepted' });
 	});
 });

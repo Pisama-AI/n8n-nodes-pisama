@@ -45,6 +45,12 @@ With the API connected, the node fetches the execution record (`GET /executions/
 - **Include Full Workflow JSON** — attach the workflow definition for structural quality assessment. The full JSON is only available when the n8n API is connected; without it, only lightweight metadata (id, name, active) is attached and structural checks stay disabled.
 - **Run Quality Assessment** — trigger Pisama's structural quality assessment. Requires the full workflow JSON (n8n API connection).
 
+## Failure isolation
+
+This node never fails your workflow. When Pisama is unreachable, slow, or rejects the request, the node logs a warning, outputs `{ "forwarded": false, "error": "..." }`, and lets the rest of the workflow run. Sends have a 10 second timeout, so a hanging endpoint cannot stall an execution.
+
+If you want a failed send to fail the node instead (for example, to make lost telemetry visible in a monitoring workflow), enable **Strict mode** in the node parameters.
+
 ## Security
 
 Payloads are signed with HMAC-SHA256 over `{timestamp}.{body}` using your webhook secret, sent as `X-Pisama-Signature: sha256=…` alongside `X-Pisama-Timestamp` and a per-request `X-Pisama-Nonce` for replay protection.

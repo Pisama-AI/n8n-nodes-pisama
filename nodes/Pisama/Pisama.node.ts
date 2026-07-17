@@ -72,6 +72,9 @@ async function fetchN8nExecution(
  * with a manually-built API-key header plus the HMAC signature headers, so the
  * generic `httpRequestWithAuthentication` helper does not apply.
  */
+/** Bounded send window: a slow or hanging Pisama endpoint must never stall the workflow. */
+const SEND_TIMEOUT_MS = 10_000;
+
 async function postToPisama(
 	ctx: IExecuteFunctions,
 	url: string,
@@ -84,8 +87,31 @@ async function postToPisama(
 		headers,
 		body,
 		json: false,
+		timeout: SEND_TIMEOUT_MS,
 	});
-	return typeof response === 'string' ? JSON.parse(response) : response;
+	if (typeof response !== 'string') return response;
+	try {
+		return JSON.parse(response);
+	} catch {
+		// A 2xx with a non-JSON body (proxy page, plain-text ack) must not throw
+		// on the send path; surface the raw string instead.
+		return response;
+	}
+}
+
+/**
+ * Best-effort HTTP status off an httpRequest error, for the failure-isolation
+ * warning. The n8n helper surfaces axios-shaped errors; NodeApiError carries
+ * `httpCode`. Returns undefined when no status is recoverable.
+ */
+function errorHttpStatus(error: unknown): string | undefined {
+	const e = error as {
+		httpCode?: unknown;
+		statusCode?: unknown;
+		response?: { status?: unknown; statusCode?: unknown };
+	};
+	const status = e.httpCode ?? e.statusCode ?? e.response?.status ?? e.response?.statusCode;
+	return status === undefined || status === null ? undefined : String(status);
 }
 
 /**
@@ -215,6 +241,14 @@ export class Pisama implements INodeType {
 				description:
 					'Whether to trigger Pisama structural quality assessment in the background. Requires the full workflow JSON, which needs the n8n API connection (see the Pisama credential).',
 			},
+			{
+				displayName: 'Strict Mode',
+				name: 'strictMode',
+				type: 'boolean',
+				default: false,
+				description:
+					'Whether a failed send to Pisama fails this node. By default send failures never interrupt the workflow: the node logs a warning and outputs forwarded: false instead.',
+			},
 		],
 	};
 
@@ -231,6 +265,7 @@ export class Pisama implements INodeType {
 
 		const includeWorkflow = this.getNodeParameter('includeWorkflow', 0) as boolean;
 		const runQuality = this.getNodeParameter('runQuality', 0) as boolean;
+		const strictMode = this.getNodeParameter('strictMode', 0, false) as boolean;
 
 		// Execution + workflow metadata from the in-node runtime. getWorkflow()
 		// only exposes {id, name, active} — the full JSON is not available here.
@@ -370,15 +405,35 @@ export class Pisama implements INodeType {
 
 		try {
 			const parsed = await postToPisama(this, url, headers, body);
-			returnData.push({ json: parsed as IDataObject, pairedItem: { item: 0 } });
+			// A non-JSON success body comes back as the raw string; wrap it so the
+			// output item is always an object.
+			const json = (
+				typeof parsed === 'object' && parsed !== null ? parsed : { response: parsed }
+			) as IDataObject;
+			returnData.push({ json, pairedItem: { item: 0 } });
 		} catch (error) {
-			if (this.continueOnFail()) {
+			if (strictMode) {
+				// Strict mode: a failed send fails the node (the pre-0.4 behavior).
+				if (this.continueOnFail()) {
+					returnData.push({
+						json: { error: (error as Error).message },
+						pairedItem: { item: 0 },
+					});
+				} else {
+					throw new NodeApiError(this.getNode(), error as JsonObject);
+				}
+			} else {
+				// Failure isolation (default): an unreachable, slow, or rejecting
+				// Pisama endpoint must never interrupt the user's workflow. Log one
+				// warning and emit an honest forwarded:false item instead.
+				const status = errorHttpStatus(error);
+				this.logger?.warn(
+					`Pisama: send failed${status ? ` (status ${status})` : ''}; workflow continues (${(error as Error).message})`,
+				);
 				returnData.push({
-					json: { error: (error as Error).message },
+					json: { forwarded: false, error: (error as Error).message },
 					pairedItem: { item: 0 },
 				});
-			} else {
-				throw new NodeApiError(this.getNode(), error as JsonObject);
 			}
 		}
 
