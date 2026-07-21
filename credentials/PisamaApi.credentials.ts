@@ -27,7 +27,7 @@ export class PisamaApi implements ICredentialType {
 			type: 'string',
 			default: 'https://api.pisama.ai/api/v1',
 			description:
-				'Pisama API base URL. Pisama platform: https://api.pisama.ai/api/v1 (the default). Pisama for n8n cloud: https://pisama-n8n-cloud.fly.dev/api/v1. Self-hosted server: http://your-server:8400/api/v1.',
+				'Pisama API base URL. Pisama platform: https://api.pisama.ai/api/v1 (the default). Pisama for n8n cloud: https://pisama-n8n-saas.fly.dev/api/v1. Self-hosted server: http://your-server:8400/api/v1.',
 		},
 		{
 			displayName: 'Webhook Secret',

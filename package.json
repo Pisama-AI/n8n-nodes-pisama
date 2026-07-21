@@ -1,6 +1,6 @@
 {
 	"name": "n8n-nodes-pisama",
-	"version": "0.5.0",
+	"version": "0.5.1",
 	"description": "n8n community node that forwards workflow executions to Pisama for failure detection and self-healing",
 	"keywords": [
 		"n8n-community-node-package",

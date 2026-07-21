@@ -24,7 +24,7 @@ credential in n8n (Credentials, New, Pisama API):
 | Credential field | Pisama for n8n cloud ([app.n8n.pisama.ai](https://app.n8n.pisama.ai)) | Pisama platform ([pisama.ai](https://pisama.ai)) | Self-hosted [pisama-n8n](https://github.com/Pisama-AI/pisama-n8n) server |
 |---|---|---|---|
 | API Key | Ingest key from Settings (starts with `pn8n_`) | Key from [pisama.ai/settings/api-keys](https://pisama.ai/settings/api-keys) (starts with `pisama_`) | Your `PISAMA_API_KEY` value |
-| API URL | `https://pisama-n8n-cloud.fly.dev/api/v1` | `https://api.pisama.ai/api/v1` (default) | `http://your-server:8400/api/v1` |
+| API URL | `https://pisama-n8n-saas.fly.dev/api/v1` | `https://api.pisama.ai/api/v1` (default) | `http://your-server:8400/api/v1` |
 | Webhook Secret | Leave empty | Required: register the workflow in Pisama to obtain it (unsigned executions are rejected) | Optional: set to `PISAMA_WEBHOOK_SECRET` to enforce HMAC, or leave empty |
 
 The credential Test button checks `{API URL}/health` and validates green against all
