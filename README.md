@@ -10,7 +10,7 @@ Without this node, integrating n8n with Pisama requires wiring an HTTP Request n
 - Runtime: token/cost budget overruns, AI node timeouts, unprotected LLM calls, resource exhaustion
 - Semantic (when LLM nodes are present): loops, hallucinations, context neglect, coordination breakdown across sub-agents
 
-See [docs.pisama.ai/integrations/n8n](https://docs.pisama.ai/integrations/n8n) for the full detector list.
+See [docs.pisama.ai/guides/integrations/n8n](https://docs.pisama.ai/guides/integrations/n8n) for the full detector list.
 
 ## Install
 
@@ -18,10 +18,17 @@ In n8n's community nodes settings, enter `n8n-nodes-pisama` and install. Restart
 
 ## Configure
 
-1. Get your API key at [pisama.ai/settings/api-keys](https://pisama.ai/settings/api-keys) (starts with `pisama_`)
-2. Register this workflow in Pisama to obtain its webhook secret. Registration is **required**: the Pisama webhook rejects unsigned executions, so you need the secret to send data.
-3. In n8n: Credentials → New → Pisama API
-4. Paste the API key and the webhook secret. Save.
+The node talks to whichever Pisama server you use. Pick your column, then create the
+credential in n8n (Credentials, New, Pisama API):
+
+| Credential field | Pisama for n8n cloud ([app.n8n.pisama.ai](https://app.n8n.pisama.ai)) | Pisama platform ([pisama.ai](https://pisama.ai)) | Self-hosted [pisama-n8n](https://github.com/Pisama-AI/pisama-n8n) server |
+|---|---|---|---|
+| API Key | Ingest key from Settings (starts with `pn8n_`) | Key from [pisama.ai/settings/api-keys](https://pisama.ai/settings/api-keys) (starts with `pisama_`) | Your `PISAMA_API_KEY` value |
+| API URL | `https://pisama-n8n-cloud.fly.dev/api/v1` | `https://api.pisama.ai/api/v1` (default) | `http://your-server:8400/api/v1` |
+| Webhook Secret | Leave empty | Required: register the workflow in Pisama to obtain it (unsigned executions are rejected) | Optional: set to `PISAMA_WEBHOOK_SECRET` to enforce HMAC, or leave empty |
+
+The credential Test button checks `{API URL}/health` and validates green against all
+three servers.
 
 ## Use
 
