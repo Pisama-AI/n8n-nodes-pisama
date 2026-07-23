@@ -16,6 +16,10 @@ See [docs.pisama.ai/guides/integrations/n8n](https://docs.pisama.ai/guides/integ
 
 In n8n's community nodes settings, enter `n8n-nodes-pisama` and install. Restart n8n. The Pisama node will appear in the node picker.
 
+The package supports Node.js 20 or newer and follows n8n's strict community-node
+validation rules. Release history is recorded in
+[CHANGELOG.md](https://github.com/Pisama-AI/n8n-nodes-pisama/blob/main/CHANGELOG.md).
+
 ## Configure
 
 The node talks to whichever Pisama server you use. Pick your column, then create the

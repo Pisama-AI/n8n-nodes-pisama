@@ -198,7 +198,7 @@ export class Pisama implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Pisama',
 		name: 'pisama',
-		icon: 'file:pisama.svg',
+		icon: { light: 'file:pisama.svg', dark: 'file:pisama.dark.svg' },
 		group: ['transform'],
 		version: 1,
 		subtitle: '={{$parameter["operation"]}}',
