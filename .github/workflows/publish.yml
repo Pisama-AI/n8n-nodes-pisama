@@ -1,4 +1,4 @@
-name: Publish to npm (with provenance)
+name: Publish to npm
 
 # n8n's verified-community-node program requires (from 2026-05-01) that packages
 # are published from GitHub Actions with an npm provenance statement, signed via
@@ -7,14 +7,10 @@ name: Publish to npm (with provenance)
 #
 # Publishing is triggered by pushing a git tag like `v0.3.0`.
 #
-# ── ONE-TIME npm SETUP ─────────────────────────────────────────────────────────
-# Recommended — OIDC Trusted Publishing (no long-lived secret):
+# One-time npm setup:
+# OIDC Trusted Publishing (no long-lived secret):
 #   npmjs.com -> the n8n-nodes-pisama package -> Settings -> Trusted Publishers
 #   -> Add GitHub Actions: repo `Pisama-AI/n8n-nodes-pisama`, workflow `publish.yml`.
-#   Leave NPM_TOKEN unset; the GitHub OIDC identity authenticates the publish.
-# Fallback — Automation token:
-#   Create a Granular Access Token (read+write for this package) and add it as the
-#   repo secret NPM_TOKEN.
 
 on:
   push:
@@ -29,17 +25,17 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
-          # Node 24 ships npm >= 11.5.1, required for OIDC trusted publishing.
           node-version: '24.x'
+          registry-url: https://registry.npmjs.org
 
       # --ignore-scripts skips the dev-only native build (isolated-vm, pulled
       # transitively by @n8n/node-cli) that n8n-node build/lint never load.
       - name: Install dependencies
-        run: npm install --ignore-scripts --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Build
         run: npm run build
@@ -47,14 +43,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Publish with provenance
-        # Trusted Publishing (recommended): NPM_TOKEN unset -> npm authenticates
-        # via GitHub OIDC, no stored secret. Token fallback: set NPM_TOKEN and it
-        # is written to the registry auth before publishing.
+      - name: Verify tag matches package version
         run: |
-          if [ -n "$NPM_TOKEN" ]; then
-            npm config set //registry.npmjs.org/:_authToken "$NPM_TOKEN"
-          fi
-          npm publish --provenance --access public
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          test "$TAG_VERSION" = "$PACKAGE_VERSION"
+
+      - name: Publish through npm trusted publishing
+        run: npm publish --access public

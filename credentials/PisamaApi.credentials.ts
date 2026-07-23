@@ -8,7 +8,7 @@ import {
 export class PisamaApi implements ICredentialType {
 	name = 'pisamaApi';
 	displayName = 'Pisama API';
-	icon = 'file:pisama.svg' as const;
+	icon = { light: 'file:pisama.svg', dark: 'file:pisama.dark.svg' } as const;
 	documentationUrl = 'https://docs.pisama.ai/guides/integrations/n8n';
 	properties: INodeProperties[] = [
 		{
