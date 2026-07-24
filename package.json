@@ -31,6 +31,8 @@
 		"lint": "n8n-node lint",
 		"lint:fix": "n8n-node lint --fix",
 		"test": "vitest run",
+		"test:coverage": "vitest run --coverage --coverage.reporter=text --coverage.thresholds.lines=95 --coverage.thresholds.functions=95 --coverage.thresholds.statements=95 --coverage.thresholds.branches=85",
+		"audit:production": "npm audit --omit=dev --audit-level=moderate",
 		"prepublishOnly": "npm run build && npm run lint"
 	},
 	"files": [
@@ -50,6 +52,7 @@
 	"devDependencies": {
 		"@n8n/node-cli": "^0.40.3",
 		"@types/node": "^20.19.43",
+		"@vitest/coverage-v8": "^3.2.4",
 		"eslint": "^9.39.5",
 		"n8n-workflow": "^2.16.0",
 		"prettier": "^3.9.6",

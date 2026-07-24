@@ -4,6 +4,8 @@ All notable changes to `n8n-nodes-pisama` are documented here.
 
 ## Unreleased
 
+- Enforce 95 percent line, function, and statement coverage in CI.
+- Add CodeQL and pull request dependency review.
 - Add security, contribution, conduct, and dependency-maintenance policies.
 - Inspect the exact npm publish tarball in CI.
 - Document the lifecycle boundary between the community node and the

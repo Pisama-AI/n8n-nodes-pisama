@@ -13,6 +13,34 @@ import { describe, it, expect } from 'vitest';
 import { createHmac } from 'node:crypto';
 
 import { Pisama } from '../nodes/Pisama/Pisama.node';
+import { PisamaApi } from '../credentials/PisamaApi.credentials';
+
+describe('Pisama credentials', () => {
+	it('exposes the documented authentication and health-check contract', () => {
+		const credentials = new PisamaApi();
+
+		expect(credentials.name).toBe('pisamaApi');
+		expect(credentials.icon).toEqual({
+			light: 'file:pisama.svg',
+			dark: 'file:pisama.dark.svg',
+		});
+		expect(credentials.properties.map((property) => property.name)).toEqual([
+			'apiKey',
+			'apiUrl',
+			'webhookSecret',
+			'n8nApiUrl',
+			'n8nApiKey',
+		]);
+		expect(credentials.authenticate.properties.headers['X-Pisama-API-Key']).toBe(
+			'={{$credentials.apiKey}}',
+		);
+		expect(credentials.test.request).toEqual({
+			baseURL: '={{$credentials.apiUrl}}',
+			url: '/health',
+			method: 'GET',
+		});
+	});
+});
 
 /**
  * Mirror of backend/app/ingestion/n8n_parser.py::parse_execution's runData
