@@ -194,6 +194,166 @@ function buildContextRunData(
 	return { runData, observedError };
 }
 
+interface TelemetrySnapshot {
+	status: string;
+	startedAt: string;
+	finishedAt: string | null;
+	runData: Record<string, unknown>;
+	workflowJson?: IDataObject;
+	telemetrySource: 'execution_context' | 'n8n_api';
+}
+
+interface WorkflowSummary {
+	id?: string;
+	name?: string;
+	active?: boolean;
+}
+
+function buildContextTelemetry(
+	ctx: IExecuteFunctions,
+	items: INodeExecutionData[],
+	nodeStartedAt: string,
+): TelemetrySnapshot {
+	const { runData, observedError } = buildContextRunData(ctx, items);
+	return {
+		status: observedError ? 'error' : 'success',
+		startedAt: nodeStartedAt,
+		finishedAt: null,
+		runData,
+		telemetrySource: 'execution_context',
+	};
+}
+
+function mergeApiTelemetry(context: TelemetrySnapshot, execution: IDataObject): TelemetrySnapshot {
+	const apiStatus = typeof execution.status === 'string' ? execution.status : undefined;
+	const apiStarted = typeof execution.startedAt === 'string' ? execution.startedAt : undefined;
+	const apiStopped = typeof execution.stoppedAt === 'string' ? execution.stoppedAt : undefined;
+	const apiRunData = ((execution.data as IDataObject)?.resultData as IDataObject)?.runData as
+		Record<string, unknown> | undefined;
+	const apiWorkflow = execution.workflowData as IDataObject | undefined;
+
+	return {
+		status: apiStatus && TERMINAL_STATUSES.has(apiStatus.toLowerCase()) ? apiStatus : context.status,
+		startedAt: apiStarted ?? context.startedAt,
+		finishedAt: apiStopped ?? context.finishedAt,
+		runData: apiRunData && Object.keys(apiRunData).length > 0 ? apiRunData : context.runData,
+		workflowJson: apiWorkflow && Array.isArray(apiWorkflow.nodes) ? apiWorkflow : context.workflowJson,
+		telemetrySource: 'n8n_api',
+	};
+}
+
+async function resolveTelemetry(
+	ctx: IExecuteFunctions,
+	credentials: PisamaCredentials,
+	executionId: string,
+	context: TelemetrySnapshot,
+): Promise<TelemetrySnapshot> {
+	if (!credentials.n8nApiUrl || !credentials.n8nApiKey) return context;
+
+	try {
+		const base = credentials.n8nApiUrl.replace(/\/$/, '');
+		const execution = await fetchN8nExecution(ctx, base, credentials.n8nApiKey, executionId);
+		if (!execution) {
+			ctx.logger?.warn(
+				`Pisama: n8n API returned no record for execution ${executionId}; sending best-effort telemetry`,
+			);
+			return context;
+		}
+		return mergeApiTelemetry(context, execution);
+	} catch (error) {
+		ctx.logger?.warn(
+			`Pisama: n8n API fetch failed for execution ${executionId}; sending best-effort telemetry (${(error as Error).message})`,
+		);
+		return context;
+	}
+}
+
+function buildPayload(
+	executionId: string,
+	workflow: WorkflowSummary,
+	mode: string,
+	telemetry: TelemetrySnapshot,
+	includeWorkflow: boolean,
+	runQuality: boolean,
+): IDataObject {
+	const payload: IDataObject = {
+		executionId,
+		workflowId: workflow.id ?? 'unknown',
+		workflowName: workflow.name ?? '',
+		mode,
+		startedAt: telemetry.startedAt,
+		finishedAt: telemetry.finishedAt,
+		status: telemetry.status,
+		telemetrySource: telemetry.telemetrySource,
+		data: { resultData: { runData: telemetry.runData } },
+		runQuality,
+	};
+
+	if (includeWorkflow) {
+		payload.workflowMeta = {
+			id: workflow.id,
+			name: workflow.name,
+			active: workflow.active,
+		};
+		if (telemetry.workflowJson) payload.workflow = telemetry.workflowJson;
+	}
+	return payload;
+}
+
+function buildRequestHeaders(credentials: PisamaCredentials, body: string): Record<string, string> {
+	const headers: Record<string, string> = {
+		'Content-Type': 'application/json',
+		'X-Pisama-API-Key': credentials.apiKey,
+	};
+	if (!credentials.webhookSecret) return headers;
+
+	const { signature, timestamp, nonce } = signPayload(body, credentials.webhookSecret);
+	headers['X-Pisama-Signature'] = signature;
+	headers['X-Pisama-Timestamp'] = timestamp;
+	headers['X-Pisama-Nonce'] = nonce;
+	return headers;
+}
+
+function successfulOutput(parsed: unknown): INodeExecutionData {
+	const json = (typeof parsed === 'object' && parsed !== null ? parsed : { response: parsed }) as IDataObject;
+	return { json, pairedItem: { item: 0 } };
+}
+
+function failedOutput(ctx: IExecuteFunctions, error: unknown, strictMode: boolean): INodeExecutionData {
+	if (strictMode) {
+		if (ctx.continueOnFail()) {
+			return {
+				json: { error: (error as Error).message },
+				pairedItem: { item: 0 },
+			};
+		}
+		throw new NodeApiError(ctx.getNode(), error as JsonObject);
+	}
+
+	const status = errorHttpStatus(error);
+	ctx.logger?.warn(
+		`Pisama: send failed${status ? ` (status ${status})` : ''}; workflow continues (${(error as Error).message})`,
+	);
+	return {
+		json: { forwarded: false, error: (error as Error).message },
+		pairedItem: { item: 0 },
+	};
+}
+
+async function forwardPayload(
+	ctx: IExecuteFunctions,
+	url: string,
+	headers: Record<string, string>,
+	body: string,
+	strictMode: boolean,
+): Promise<INodeExecutionData> {
+	try {
+		return successfulOutput(await postToPisama(ctx, url, headers, body));
+	} catch (error) {
+		return failedOutput(ctx, error, strictMode);
+	}
+}
+
 export class Pisama implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Pisama',
@@ -261,7 +421,6 @@ export class Pisama implements INodeType {
 
 		const items = this.getInputData();
 		const credentials = (await this.getCredentials('pisamaApi')) as unknown as PisamaCredentials;
-		const returnData: INodeExecutionData[] = [];
 
 		const includeWorkflow = this.getNodeParameter('includeWorkflow', 0) as boolean;
 		const runQuality = this.getNodeParameter('runQuality', 0) as boolean;
@@ -273,170 +432,12 @@ export class Pisama implements INodeType {
 		const workflow = this.getWorkflow();
 		const mode = this.getMode();
 
-		// --- Best-effort telemetry from the execution context (Tier 2) ---
-		// A mid-run node sees only the items on its own input, so buildContextRunData
-		// emits an honest, PARTIAL view: the immediately-upstream node's output in
-		// the parser's list-of-runs shape. What n8n does NOT expose to a mid-run
-		// node — and which therefore stays absent here, filled in only by the
-		// optional n8n-API (Tier 1) path below — is: per-node run timing, the
-		// workflow's true start/finish timestamps (`$execution` carries the id and
-		// mode but no timing), the run data of non-upstream nodes, and the full
-		// workflow JSON (node types + parameters).
-		const { runData: contextRunData, observedError } = buildContextRunData(this, items);
-
-		// Status: a mid-run node cannot observe the workflow's FINAL status (the
-		// execution is still in flight and n8n exposes no terminal status from the
-		// node context), so we derive a best-effort status from observed upstream
-		// error markers rather than hardcoding 'success'. The authoritative status
-		// arrives only via the n8n API path below.
-		let status = observedError ? 'error' : 'success';
-		// startedAt: the real moment this node executed, used as the trace's time
-		// anchor. It is NOT the workflow's true start (not exposed mid-run); the
-		// `telemetrySource: execution_context` field records that provenance.
-		let startedAt = nodeStartedAt;
-		// finishedAt: the workflow has NOT finished when a mid-run node reports,
-		// and n8n exposes no finish time here — so it is honestly null rather than
-		// a fabricated `new Date()`. The n8n API path fills it for terminal rows.
-		let finishedAt: string | null = null;
-		let runData: Record<string, unknown> = contextRunData;
-		let workflowJson: IDataObject | undefined;
-		let telemetrySource = 'execution_context';
-
-		// --- Authoritative telemetry from the n8n REST API (Tier 1) ---
-		// When the credential carries n8n API details, fetch the execution record
-		// for authoritative status/timestamps/run data and the full workflow JSON.
-		if (credentials.n8nApiUrl && credentials.n8nApiKey) {
-			try {
-				const base = credentials.n8nApiUrl.replace(/\/$/, '');
-				const execution = await fetchN8nExecution(
-					this,
-					base,
-					credentials.n8nApiKey,
-					executionId,
-				);
-
-				telemetrySource = 'n8n_api';
-
-				const apiStatus = typeof execution.status === 'string' ? execution.status : undefined;
-				const apiStarted = typeof execution.startedAt === 'string' ? execution.startedAt : undefined;
-				const apiStopped = typeof execution.stoppedAt === 'string' ? execution.stoppedAt : undefined;
-				const apiRunData = (((execution.data as IDataObject)?.resultData as IDataObject)
-					?.runData as Record<string, unknown>) ?? undefined;
-				const apiWorkflow = execution.workflowData as IDataObject | undefined;
-
-				// startedAt is set at execution start and is authoritative even
-				// for an in-flight row.
-				if (apiStarted) startedAt = apiStarted;
-				// stoppedAt / status are only final for a terminal row. For the
-				// current (still-running) execution they are null/`running`, so
-				// keep the best-effort values in that case.
-				if (apiStopped) finishedAt = apiStopped;
-				if (apiStatus && TERMINAL_STATUSES.has(apiStatus.toLowerCase())) {
-					status = apiStatus;
-				}
-				if (apiRunData && Object.keys(apiRunData).length > 0) {
-					runData = apiRunData;
-				}
-				if (apiWorkflow && Array.isArray(apiWorkflow.nodes)) {
-					workflowJson = apiWorkflow;
-				}
-			} catch (error) {
-				// Non-fatal: fall back to the best-effort context telemetry. The
-				// execution is still forwarded so detection is never blocked by a
-				// misconfigured or unreachable n8n API.
-				this.logger?.warn(
-					`Pisama: n8n API fetch failed for execution ${executionId}; sending best-effort telemetry (${(error as Error).message})`,
-				);
-			}
-		}
-
-		const payload: IDataObject = {
-			executionId,
-			workflowId: workflow.id ?? 'unknown',
-			workflowName: workflow.name ?? '',
-			mode,
-			startedAt,
-			finishedAt,
-			status,
-			telemetrySource,
-			data: {
-				resultData: {
-					runData,
-				},
-			},
-		};
-
-		if (includeWorkflow) {
-			// Lightweight, always-honest metadata. Redundant with the top-level
-			// ids but harmless, and it distinguishes "workflow known" from
-			// "workflow JSON available".
-			payload.workflowMeta = {
-				id: workflow.id,
-				name: workflow.name,
-				active: workflow.active,
-			};
-			// The FULL workflow JSON — only present via the n8n API. It feeds both
-			// the structural detectors and the quality assessment, so attach it
-			// whenever it's the genuine full definition (never metadata-only,
-			// which would drive a degenerate assessment). Whether the quality
-			// assessment actually runs is a separate, backend-honored decision.
-			if (workflowJson) {
-				payload.workflow = workflowJson;
-			}
-		}
-
-		// Let the backend gate the (heavier) structural quality assessment
-		// independently of attaching the workflow JSON for structural detection.
-		payload.runQuality = runQuality;
-
+		const context = buildContextTelemetry(this, items, nodeStartedAt);
+		const telemetry = await resolveTelemetry(this, credentials, executionId, context);
+		const payload = buildPayload(executionId, workflow, mode, telemetry, includeWorkflow, runQuality);
 		const body = JSON.stringify(payload);
 		const url = `${credentials.apiUrl.replace(/\/$/, '')}/n8n/webhook`;
-		const headers: Record<string, string> = {
-			'Content-Type': 'application/json',
-			'X-Pisama-API-Key': credentials.apiKey,
-		};
-
-		if (credentials.webhookSecret) {
-			const { signature, timestamp, nonce } = signPayload(body, credentials.webhookSecret);
-			headers['X-Pisama-Signature'] = signature;
-			headers['X-Pisama-Timestamp'] = timestamp;
-			headers['X-Pisama-Nonce'] = nonce;
-		}
-
-		try {
-			const parsed = await postToPisama(this, url, headers, body);
-			// A non-JSON success body comes back as the raw string; wrap it so the
-			// output item is always an object.
-			const json = (
-				typeof parsed === 'object' && parsed !== null ? parsed : { response: parsed }
-			) as IDataObject;
-			returnData.push({ json, pairedItem: { item: 0 } });
-		} catch (error) {
-			if (strictMode) {
-				// Strict mode: a failed send fails the node (the pre-0.4 behavior).
-				if (this.continueOnFail()) {
-					returnData.push({
-						json: { error: (error as Error).message },
-						pairedItem: { item: 0 },
-					});
-				} else {
-					throw new NodeApiError(this.getNode(), error as JsonObject);
-				}
-			} else {
-				// Failure isolation (default): an unreachable, slow, or rejecting
-				// Pisama endpoint must never interrupt the user's workflow. Log one
-				// warning and emit an honest forwarded:false item instead.
-				const status = errorHttpStatus(error);
-				this.logger?.warn(
-					`Pisama: send failed${status ? ` (status ${status})` : ''}; workflow continues (${(error as Error).message})`,
-				);
-				returnData.push({
-					json: { forwarded: false, error: (error as Error).message },
-					pairedItem: { item: 0 },
-				});
-			}
-		}
-
-		return [returnData];
+		const headers = buildRequestHeaders(credentials, body);
+		return [[await forwardPayload(this, url, headers, body, strictMode)]];
 	}
 }

@@ -30,10 +30,11 @@
 		"dev": "n8n-node dev",
 		"lint": "n8n-node lint",
 		"lint:fix": "n8n-node lint --fix",
+		"quality:complexity": "eslint nodes credentials --rule 'complexity: [\"error\", 15]'",
 		"test": "vitest run",
-		"test:coverage": "vitest run --coverage --coverage.reporter=text --coverage.thresholds.lines=95 --coverage.thresholds.functions=95 --coverage.thresholds.statements=95 --coverage.thresholds.branches=85",
+		"test:coverage": "vitest run --coverage --coverage.reporter=text --coverage.thresholds.lines=100 --coverage.thresholds.functions=100 --coverage.thresholds.statements=100 --coverage.thresholds.branches=90",
 		"audit:production": "npm audit --omit=dev --audit-level=moderate",
-		"prepublishOnly": "npm run build && npm run lint"
+		"prepublishOnly": "npm run build && npm run lint && npm run quality:complexity"
 	},
 	"files": [
 		"dist",

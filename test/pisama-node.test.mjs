@@ -77,9 +77,10 @@ function makeContext(opts) {
 		strictMode = false,
 		prevNodeByIndex,
 		inputSourceNode,
-		proxyThrows = false,
-		execution,
-		postResponse = { received: true },
+			proxyThrows = false,
+			execution,
+			getError,
+			postResponse = { received: true },
 		postError,
 		continueOnFail = false,
 	} = opts;
@@ -111,9 +112,12 @@ function makeContext(opts) {
 		getNode: () => ({ name: 'Pisama' }),
 		logger: { warn: (msg) => warnings.push(msg) },
 		helpers: {
-			httpRequest: async (request) => {
-				httpCalls.push(request);
-				if (request.method === 'GET') return execution;
+				httpRequest: async (request) => {
+					httpCalls.push(request);
+					if (request.method === 'GET') {
+						if (getError) throw getError;
+						return execution;
+					}
 				if (postError) throw postError;
 				return postResponse;
 			},
@@ -289,6 +293,20 @@ describe('Pisama node — Tier 2 (zero-config, no n8n API)', () => {
 		expect(post.body).not.toContain(post.headers['X-Pisama-Nonce']);
 	});
 
+	it('sends without signature headers when no webhook secret is configured', async () => {
+		const { webhookSecret: _omitted, ...credentials } = TIER2_CREDS;
+		const { post } = await run({
+			items: [{ json: { output: 'hi' } }],
+			credentials,
+			prevNodeByIndex: () => 'AI Agent',
+			inputSourceNode: 'AI Agent',
+		});
+
+		expect(post.headers['X-Pisama-Signature']).toBeUndefined();
+		expect(post.headers['X-Pisama-Timestamp']).toBeUndefined();
+		expect(post.headers['X-Pisama-Nonce']).toBeUndefined();
+	});
+
 	it('posts to the Pisama webhook and never calls the n8n API', async () => {
 		const { post, get } = await run({
 			items: [{ json: {} }],
@@ -352,10 +370,8 @@ describe('Pisama node — Tier 1 (n8n API connected)', () => {
 	});
 
 	it('falls back to best-effort telemetry when the n8n API call fails', async () => {
-		// execution=undefined → the GET resolves to undefined; the node reads
-		// fields off it and continues with the Tier 2 values. A hard throw is
-		// covered by the catch; here we assert the graceful degrade path keeps
-		// forwarding rather than blocking detection.
+		// execution=undefined means the GET returned no usable record. The graceful
+		// degradation path must keep forwarding without claiming API provenance.
 		const { body } = await run({
 			items: [{ json: { output: 'hi' } }],
 			credentials: TIER1_CREDS,
@@ -363,9 +379,39 @@ describe('Pisama node — Tier 1 (n8n API connected)', () => {
 			inputSourceNode: 'AI Agent',
 			execution: undefined,
 		});
-		// No usable API data → Tier 2 shape/provenance retained.
-		expect(body.telemetrySource).toBe('n8n_api'); // source flips on attempt
+		// No usable API data means the Tier 2 shape and provenance are retained.
+		expect(body.telemetrySource).toBe('execution_context');
 		expect(Array.isArray(body.data.resultData.runData['AI Agent'])).toBe(true);
+	});
+
+	it('keeps context values for an in-flight API execution with partial data', async () => {
+		const { body } = await run({
+			items: [{ json: { output: 'hi' } }],
+			credentials: TIER1_CREDS,
+			prevNodeByIndex: () => 'AI Agent',
+			inputSourceNode: 'AI Agent',
+			execution: { status: 'running', data: { resultData: { runData: {} } } },
+		});
+
+		expect(body.telemetrySource).toBe('n8n_api');
+		expect(body.status).toBe('success');
+		expect(body.finishedAt).toBeNull();
+		expect(Array.isArray(body.data.resultData.runData['AI Agent'])).toBe(true);
+		expect(body.workflow).toBeUndefined();
+	});
+
+	it('falls back and warns when the n8n API request rejects', async () => {
+		const { body, warnings } = await run({
+			items: [{ json: { output: 'hi' } }],
+			credentials: TIER1_CREDS,
+			prevNodeByIndex: () => 'AI Agent',
+			inputSourceNode: 'AI Agent',
+			getError: new Error('n8n API unavailable'),
+		});
+
+		expect(body.telemetrySource).toBe('execution_context');
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toContain('n8n API unavailable');
 	});
 });
 

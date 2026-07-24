@@ -4,7 +4,14 @@ All notable changes to `n8n-nodes-pisama` are documented here.
 
 ## Unreleased
 
-- Enforce 95 percent line, function, and statement coverage in CI.
+- Preserve `execution_context` provenance when the n8n API returns no usable
+  execution record.
+- Split telemetry collection, payload construction, signing, and failure
+  isolation into bounded units with a CI-enforced complexity ceiling of 15.
+- Cover partial and unavailable n8n API responses plus unsigned webhook
+  delivery, reaching 100 percent line and function coverage.
+- Enforce 100 percent line, function, and statement coverage plus 90 percent
+  branch coverage in CI.
 - Add CodeQL and pull request dependency review.
 - Add security, contribution, conduct, and dependency-maintenance policies.
 - Inspect the exact npm publish tarball in CI.
