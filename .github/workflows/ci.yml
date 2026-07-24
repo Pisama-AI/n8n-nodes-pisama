@@ -20,7 +20,7 @@ jobs:
         with:
           # isolated-vm (pulled transitively by @n8n/node-cli) needs Node >= 22
           # to compile; npm ci on Node 20 fails in node-gyp.
-          node-version: '22'
+          node-version: "22"
           cache: npm
 
       - name: Install dependencies
@@ -31,6 +31,9 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      - name: Enforce complexity ceiling
+        run: npm run quality:complexity
 
       - name: Test
         run: npm run test:coverage

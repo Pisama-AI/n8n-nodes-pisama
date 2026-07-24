@@ -43,11 +43,23 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Enforce complexity ceiling
+        run: npm run quality:complexity
+
+      - name: Test with coverage gates
+        run: npm run test:coverage
+
+      - name: Audit production dependencies
+        run: npm run audit:production
+
       - name: Verify tag matches package version
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#v}"
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
           test "$TAG_VERSION" = "$PACKAGE_VERSION"
+
+      - name: Inspect publish tarball
+        run: npm pack --dry-run
 
       - name: Publish through npm trusted publishing
         run: npm publish --access public
