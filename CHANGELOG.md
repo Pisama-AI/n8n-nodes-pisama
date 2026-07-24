@@ -2,6 +2,13 @@
 
 All notable changes to `n8n-nodes-pisama` are documented here.
 
+## Unreleased
+
+- Add security, contribution, conduct, and dependency-maintenance policies.
+- Inspect the exact npm publish tarball in CI.
+- Document the lifecycle boundary between the community node and the
+  self-hosted Pisama for n8n service.
+
 ## [0.5.2] - 2026-07-23
 
 ### Changed
