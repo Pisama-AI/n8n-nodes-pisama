@@ -34,3 +34,6 @@ jobs:
 
       - name: Test
         run: npm test
+
+      - name: Inspect publish tarball
+        run: npm pack --dry-run

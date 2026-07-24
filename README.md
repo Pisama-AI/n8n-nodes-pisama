@@ -1,5 +1,9 @@
 # n8n-nodes-pisama
 
+[![CI](https://github.com/Pisama-AI/n8n-nodes-pisama/actions/workflows/ci.yml/badge.svg)](https://github.com/Pisama-AI/n8n-nodes-pisama/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/n8n-nodes-pisama.svg)](https://www.npmjs.com/package/n8n-nodes-pisama)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 An n8n community node that forwards workflow executions to [Pisama](https://pisama.ai) for failure detection and self-healing.
 
 Without this node, integrating n8n with Pisama requires wiring an HTTP Request node by hand, computing HMAC signatures yourself, and shaping the payload to match the Pisama webhook contract. With this node, you drop "Pisama" on any workflow, authenticate once, and every subsequent execution is analyzed.
@@ -65,6 +69,17 @@ If you want a failed send to fail the node instead (for example, to make lost te
 ## Security
 
 Payloads are signed with HMAC-SHA256 over `{timestamp}.{body}` using your webhook secret, sent as `X-Pisama-Signature: sha256=…` alongside `X-Pisama-Timestamp` and a per-request `X-Pisama-Nonce` for replay protection.
+
+Report vulnerabilities privately using the process in
+[SECURITY.md](SECURITY.md). Do not include secrets or workflow data in public
+issues.
+
+## Package lifecycle
+
+This is the supported n8n community-node integration. The separate
+[`pisama-n8n`](https://github.com/Pisama-AI/pisama-n8n) repository is the
+self-hosted analysis service and dashboard. They serve different roles and
+neither replaces the other.
 
 ## Self-hosted Pisama
 
