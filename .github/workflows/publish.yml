@@ -84,5 +84,15 @@ jobs:
           name: package
           path: dist/
 
+      - name: Select npm dist-tag
+        id: dist
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [[ "$VERSION" == *-* ]]; then
+            echo "tag=next" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish through npm trusted publishing
-        run: npm publish dist/*.tgz --access public
+        run: npm publish dist/*.tgz --access public --tag "${{ steps.dist.outputs.tag }}"
