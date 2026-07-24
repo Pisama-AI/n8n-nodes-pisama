@@ -4,7 +4,21 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    groups:
+      development-tools:
+        dependency-type: development
+    ignore:
+      - dependency-name: eslint
+        update-types:
+          - version-update:semver-major
+      - dependency-name: "@types/node"
+        update-types:
+          - version-update:semver-major
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    groups:
+      actions:
+        patterns:
+          - "*"
