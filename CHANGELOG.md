@@ -8,6 +8,8 @@ All notable changes to `n8n-nodes-pisama` are documented here.
 - Inspect the exact npm publish tarball in CI.
 - Document the lifecycle boundary between the community node and the
   self-hosted Pisama for n8n service.
+- Validate against the current n8n workflow types and node CLI, and refresh
+  supported maintenance tooling.
 
 ## [0.5.2] - 2026-07-23
 
