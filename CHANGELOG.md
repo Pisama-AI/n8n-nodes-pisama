@@ -4,6 +4,9 @@ All notable changes to `n8n-nodes-pisama` are documented here.
 
 ## Unreleased
 
+- Build and exercise the node in CI against the n8n 1.x and 2.x compatibility
+  floors and current releases, making the validator-required wildcard peer
+  dependency testable.
 - Preserve `execution_context` provenance when the n8n API returns no usable
   execution record.
 - Split telemetry collection, payload construction, signing, and failure

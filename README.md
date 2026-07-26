@@ -20,8 +20,12 @@ See [docs.pisama.ai/guides/integrations/n8n](https://docs.pisama.ai/guides/integ
 
 In n8n's community nodes settings, enter `n8n-nodes-pisama` and install. Restart n8n. The Pisama node will appear in the node picker.
 
-The package supports Node.js 20 or newer and follows n8n's strict community-node
-validation rules. Release history is recorded in
+The package supports Node.js 20 or newer. Its maintained compatibility target
+is `n8n-workflow` 1.120 or newer in the 1.x line and the 2.x line. CI builds and
+exercises the node against both compatibility floors and the current release in
+each line. n8n's strict community-node validator requires the published peer
+dependency to remain `*`, so the CI matrix is the enforceable compatibility
+contract. Release history is recorded in
 [CHANGELOG.md](https://github.com/Pisama-AI/n8n-nodes-pisama/blob/main/CHANGELOG.md).
 
 ## Configure
@@ -50,7 +54,7 @@ A community node runs *inside* the execution it is reporting on, so from the nod
 
 For **authoritative** telemetry, connect your n8n public REST API in the Pisama credential:
 
-1. In n8n: Settings → n8n API → create an API key.
+1. In n8n, open Settings, then n8n API, and create an API key.
 2. In the Pisama credential, set **n8n API URL** (e.g. `https://your-instance.app.n8n.cloud/api/v1`) and **n8n API Key**.
 
 With the API connected, the node fetches the execution record (`GET /executions/{id}?includeData=true`) and forwards the real `status`, `startedAt`/`stoppedAt`, full per-node run data, and the full workflow JSON that the structural detectors and quality assessment depend on. The n8n API key is sent only to your n8n instance, never to Pisama. The `telemetrySource` field on each payload records whether it came from the n8n API (`n8n_api`) or the node context (`execution_context`).
