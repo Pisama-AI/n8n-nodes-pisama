@@ -12,15 +12,24 @@ permissions:
 
 jobs:
   test:
+    name: Build and test (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The development toolchain cannot be installed below Node 22:
+        # @n8n/node-cli pulls isolated-vm transitively, and isolated-vm declares
+        # engines.node ">=22" and fails to compile under node-gyp on Node 20.
+        # Node 20 is still a supported *consumer* runtime, and package.json
+        # engines says so. It is covered by the consumer-node-20 job below,
+        # which exercises the published tarball instead of the dev install.
+        node: ["22", "24"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          # isolated-vm (pulled transitively by @n8n/node-cli) needs Node >= 22
-          # to compile; npm ci on Node 20 fails in node-gyp.
-          node-version: "22"
+          node-version: ${{ matrix.node }}
           cache: npm
 
       - name: Install dependencies
@@ -43,3 +52,51 @@ jobs:
 
       - name: Inspect publish tarball
         run: npm pack --dry-run
+
+      - name: Pack publish tarball
+        run: |
+          mkdir -p "$RUNNER_TEMP/release"
+          npm pack --pack-destination "$RUNNER_TEMP/release"
+
+      - name: Verify the published tarball in a clean consumer
+        run: ./scripts/verify-consumer-install.sh "$RUNNER_TEMP"/release/n8n-nodes-pisama-*.tgz
+
+  consumer-node-20:
+    name: Consumer install (Node 20)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Build the tarball on a Node the dev toolchain supports, then drop to the
+      # lowest runtime package.json "engines" claims and install that tarball the
+      # way a user would. The package ships no runtime dependencies, so nothing
+      # inside it needs a compiler on Node 20.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Pack publish tarball
+        run: |
+          mkdir -p "$RUNNER_TEMP/release"
+          npm pack --pack-destination "$RUNNER_TEMP/release"
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "20"
+
+      - name: Verify the published tarball on Node 20
+        env:
+          # n8n-workflow 1.120.15 added @n8n/expression-runtime, which depends on
+          # isolated-vm and therefore cannot itself be installed on Node 20. Pin
+          # the peer below that line: a user whose n8n runs on Node 20 is by
+          # definition on an n8n-workflow that still installs there. The Node 22
+          # and 24 legs above run this same check against current n8n-workflow.
+          N8N_WORKFLOW_RANGE: "<1.120.15"
+        run: ./scripts/verify-consumer-install.sh "$RUNNER_TEMP"/release/n8n-nodes-pisama-*.tgz
