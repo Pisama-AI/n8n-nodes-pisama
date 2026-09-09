@@ -9,7 +9,7 @@ export class PisamaApi implements ICredentialType {
 	name = 'pisamaApi';
 	displayName = 'Pisama API';
 	icon = { light: 'file:pisama.svg', dark: 'file:pisama.dark.svg' } as const;
-	documentationUrl = 'https://docs.pisama.ai/guides/integrations/n8n';
+	documentationUrl = 'https://github.com/Pisama-AI/n8n-nodes-pisama/blob/main/README.md#configure';
 	properties: INodeProperties[] = [
 		{
 			displayName: 'API Key',

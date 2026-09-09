@@ -14,7 +14,7 @@ Without this node, integrating n8n with Pisama requires wiring an HTTP Request n
 - Runtime: token/cost budget overruns, AI node timeouts, unprotected LLM calls, resource exhaustion
 - Semantic (when LLM nodes are present): loops, hallucinations, context neglect, coordination breakdown across sub-agents
 
-See [docs.pisama.ai/guides/integrations/n8n](https://docs.pisama.ai/guides/integrations/n8n) for the full detector list.
+See [configuration](#configure) and [telemetry fidelity](#telemetry-fidelity-connect-the-n8n-api-recommended) below for setup requirements and the limits of the available execution data.
 
 ## Install
 

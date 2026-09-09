@@ -2,7 +2,17 @@
 
 All notable changes to `n8n-nodes-pisama` are documented here.
 
-## Unreleased
+## [0.5.3] - 2026-09-08
+
+- Replace the retired documentation link in credential help and README with
+  the maintained package configuration and telemetry guidance.
+- Include the maintenance updates since 0.5.2: refreshed development tooling,
+  Node consumer-install CI checks, publish workflow maintenance, and copyright
+  attribution. No execution-payload or authentication behavior changes.
+
+## Historical maintenance notes
+
+These notes were already included in the 0.5.2 tag under an "Unreleased" heading.
 
 - Preserve `execution_context` provenance when the n8n API returns no usable
   execution record.
