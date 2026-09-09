@@ -51,6 +51,9 @@ jobs:
       - name: Audit production dependencies
         run: npm run audit:production
 
+      - name: Reject high and critical findings including development dependencies
+        run: npm run audit:all-high
+
       - name: Verify tag matches package version
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#v}"
