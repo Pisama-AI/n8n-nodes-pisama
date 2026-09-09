@@ -20,6 +20,9 @@ describe('Pisama credentials', () => {
 		const credentials = new PisamaApi();
 
 		expect(credentials.name).toBe('pisamaApi');
+		expect(credentials.documentationUrl).toBe(
+			'https://github.com/Pisama-AI/n8n-nodes-pisama/blob/main/README.md#configure',
+		);
 		expect(credentials.icon).toEqual({
 			light: 'file:pisama.svg',
 			dark: 'file:pisama.dark.svg',
