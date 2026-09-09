@@ -50,6 +50,9 @@ jobs:
       - name: Audit production dependencies
         run: npm run audit:production
 
+      - name: Reject high and critical findings including development dependencies
+        run: npm run audit:all-high
+
       - name: Inspect publish tarball
         run: npm pack --dry-run
 

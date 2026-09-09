@@ -34,6 +34,7 @@
 		"test": "vitest run",
 		"test:coverage": "vitest run --coverage --coverage.reporter=text --coverage.thresholds.lines=100 --coverage.thresholds.functions=100 --coverage.thresholds.statements=100 --coverage.thresholds.branches=90",
 		"audit:production": "npm audit --omit=dev --audit-level=moderate",
+		"audit:all-high": "npm audit --include=dev --include=optional --include=peer --audit-level=high",
 		"prepublishOnly": "npm run build && npm run lint && npm run quality:complexity"
 	},
 	"files": [
