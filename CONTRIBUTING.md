@@ -26,3 +26,9 @@ high-or-critical findings across the full dependency tree. A passing full-tree
 gate can still report moderate findings; do not describe it as a clean audit.
 Track those findings and verify upstream compatibility before changing pinned
 transitive dependencies or forcing a major-version override.
+
+The full-tree gate honors the exceptions in `scripts/audit-all-high.mjs`. Each one
+covers a single advisory in a single development-only package that cannot be
+fixed yet, with the reason and an expiry date, and the gate fails again once that
+date passes. Never add an exception for anything the package ships, and recheck
+for a real fix before extending one.
