@@ -2,6 +2,24 @@
 
 All notable changes to `n8n-nodes-pisama` are documented here.
 
+## [0.5.4] - 2026-11-02
+
+### Removed
+
+- Removed the hosted Pisama for n8n cloud service from the credential help and
+  README. The service was shut down on 2026-11-02, so the Pisama platform and a
+  self-hosted server are the two supported options. No execution-payload or
+  authentication behavior changes.
+
+### Action required
+
+- If a saved Pisama credential still points at the hosted service, its sends now
+  fail and keys issued by that service no longer work. Workflows keep running
+  unless Strict mode is on, but their executions stop reaching Pisama. Update the
+  credential for the Pisama platform (API URL `https://api.pisama.ai/api/v1`, a
+  key from pisama.ai/settings/api-keys, and the webhook secret issued when you
+  register the workflow) or for your own self-hosted server.
+
 ## [0.5.3] - 2026-09-08
 
 - Replace the retired documentation link in credential help and README with
