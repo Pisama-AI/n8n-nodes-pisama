@@ -19,7 +19,7 @@ export class PisamaApi implements ICredentialType {
 			default: '',
 			required: true,
 			description:
-				'Your Pisama key for the server named in API URL. Pisama for n8n cloud: an ingest key from Settings at app.n8n.pisama.ai (starts with pn8n_). Pisama platform: a key from pisama.ai/settings/api-keys (starts with pisama_). Self-hosted server: the PISAMA_API_KEY value.',
+				'Your Pisama key for the server named in API URL. Pisama platform: a key from pisama.ai/settings/api-keys (starts with pisama_). Self-hosted server: the PISAMA_API_KEY value.',
 		},
 		{
 			displayName: 'API URL',
@@ -27,7 +27,7 @@ export class PisamaApi implements ICredentialType {
 			type: 'string',
 			default: 'https://api.pisama.ai/api/v1',
 			description:
-				'Pisama API base URL. Pisama platform: https://api.pisama.ai/api/v1 (the default). Pisama for n8n cloud: https://pisama-n8n-saas.fly.dev/api/v1. Self-hosted server: http://your-server:8400/api/v1.',
+				'Pisama API base URL. Pisama platform: https://api.pisama.ai/api/v1 (the default). Self-hosted server: http://your-server:8400/api/v1.',
 		},
 		{
 			displayName: 'Webhook Secret',
@@ -36,7 +36,7 @@ export class PisamaApi implements ICredentialType {
 			typeOptions: { password: true },
 			default: '',
 			description:
-				'HMAC secret for signing payloads. Required by the Pisama platform (api.pisama.ai), which issues it when you register the workflow and rejects unsigned executions. Pisama for n8n cloud: leave empty (the ingest key authenticates on its own). Self-hosted server: set to PISAMA_WEBHOOK_SECRET to enforce signatures, or leave empty to authenticate by API key alone.',
+				'HMAC secret for signing payloads. Required by the Pisama platform (api.pisama.ai), which issues it when you register the workflow and rejects unsigned executions. Self-hosted server: set to PISAMA_WEBHOOK_SECRET to enforce signatures, or leave empty to authenticate by API key alone.',
 		},
 		{
 			displayName: 'n8n API URL',
